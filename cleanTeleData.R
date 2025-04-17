@@ -1,3 +1,20 @@
+# LOAD PACKAGES ----------------------------------------------------------------
+library(dplyr)
+library(RODBC)
+library(amt)
+library(dplyr)
+# READ IN DATA -----------------------------------------------------------------
+
+
+# how to select all from a table with " " in name
+# query2 <- "select * from [Metadata - Work in Progress]"
+
+## open channel
+chnl <- odbcDriverConnect("Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=./data/SMC.accdb")
+## create query
+query <- "select * from Telemetry"
+## read in Telemetry table
+dat <- sqlQuery(chnl, query)
 
 # CLEAN TELEMETRY DATA ---------------------------------------------------------
 
@@ -11,9 +28,9 @@ dat$DateTime <- as.POSIXct(paste(dat$Date,format(dat$Time, "%H:%M:%S")),
 stps <- amt::make_track(dat %>% filter(!is.na(DateTime)) %>%
 													arrange(DateTime),
 												.x = "Longitude", .y = "Latitude",
-												.t = "DateTime", all_cols = TRUE) %>%
-	track_resample() %>% steps_by_burst(keep_cols = "start") %>%
-	random_steps(n_control = 10)
+												.t = "DateTime", all_cols = TRUE)
+	# track_resample() %>% steps_by_burst(keep_cols = "start") %>%
+	# random_steps(n_control = 10)
 
 # final2 <- stps %>%
 # 	# Step 1
