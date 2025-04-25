@@ -1,29 +1,34 @@
 library(nimble)
 library(coda)
 mod <- nimbleCode ({
-
-	for(t in 1:(nyears-1)){
-		s.const[t] ~ dunif(0,1)
-		r.const[t] ~ dunif(0,1)
+	beta0.r ~ dunif(0,1)
+	beta0.s ~ dunif(0,1)
+	prec.beta1.r ~ dgamma(0.5,0.5)
+	prec.beta1.s ~ dgamma(0.5,0.5)
+	beta1.r.sigma <- 1/prec.beta1.r
+	beta1.s.sigma <- 1/prec.beta1.s
+	for(i in 1:ndistinctmonths){
+		beta1.r[i] ~ dunif(0,prec.beta1.r)# see how month affects recovery
+		beta1.s[i] ~ dunif(0,prec.beta1.s)
 	}
-	for(t in 1:(nyears-1)){
-			s[t] <- s.const[t]
-			r[t] <- r.const[t]
+	for(t in 1:(nmonths-1)){
+			s[t] <- beta0.s + beta1.s[months[t]] * months[t]
+			r[t] <- beta0.r + beta1.r[months[t]] * months[t]
 		}
-	for(t in 1:(nyears - 1)){
-		marr[t,1:nyears] ~ dmulti(pi[t,1:nyears], rel[t])
+	for(t in 1:(nmonths - 1)){
+		marr[t,1:nmonths] ~ dmulti(pi[t,1:nmonths], rel[t])
 		}
-	for(t in 1:(nyears-1)){
+	for(t in 1:(nmonths-1)){
 		pi[t,t] <- (1-s[t]) * r[t] # diagonal
-		for(j in (t+1):(nyears - 1)){
+		for(j in (t+1):(nmonths - 1)){
 			pi[t,j] <- prod(s[t:(j-1)]*(1-s[j]))*r[j]
 		} # j
 		for(j in 1:(t-1)){
 			pi[t,j] <- 0
 		} # j
 	} # t
-	for(t in 1:(nyears - 1)){
-		pi[t,nyears] <- 1 - sum(pi[t,1:(nyears-1)])
+	for(t in 1:(nmonths - 1)){
+		pi[t,nmonths] <- 1 - sum(pi[t,1:(nmonths-1)])
 	}
 
 })
@@ -31,16 +36,16 @@ mod <- nimbleCode ({
 # Build NIMBLE model
 mod <- nimbleModel(
 	mod,
-	const = list(nyears = nyears,
-							 ninds = ninds),
-	data = list(marr = out,
-							rel = rowSums(out)),
-	inits = list(r.const = rep(0.5,(nyears-1)),
-							 r.const = rep(0.5,(nyears-1)))
-)
+	const = list(nmonths = nmonths,
+							 ninds = nrow(marr),
+							 ndistinctmonths = length(seq(1,12,by=1)),
+							 months = months),
+	data = list(marr = marr,
+							rel = rowSums(marr))) # vector containing numeric value associated w each month
 
 comp.mod <- compileNimble(mod)
-conf.mod <- configureMCMC(comp.mod, monitors = c('r.const','s.const'),  enableWAIC = TRUE)
+conf.mod <- configureMCMC(comp.mod, monitors = c('beta1.s','beta1.r', 'beta1.r.sigma',
+																								 'beta1.s.sigma'),  enableWAIC = TRUE)
 mod.mcmc <- buildMCMC(conf.mod)
 c.mod <- compileNimble(mod.mcmc)
 ## Run MCMC

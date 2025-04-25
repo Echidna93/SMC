@@ -3,7 +3,7 @@ library(dplyr)
 library(RODBC)
 library(amt)
 library(dplyr)
-library(IPMbook)
+library(IPMbook) # Kery & Schuab package
 library(lubridate)
 # READ IN DATA -----------------------------------------------------------------
 
