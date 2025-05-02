@@ -5,11 +5,16 @@ library(amt)
 library(dplyr)
 library(IPMbook) # Kery & Schuab package
 library(lubridate)
+library(tidyr) # for pivot_*
+
 # READ IN DATA -----------------------------------------------------------------
 
 
 # how to select all from a table with " " in name
 # query2 <- "select * from [Metadata - Work in Progress]"
+
+# read in data from Lamb et al. 2023
+treatments <- read.csv("./data/treatments-lamb-2023.csv")
 
 ## open channel
 chnl <- odbcDriverConnect("Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=./data/SMC.accdb")
@@ -81,8 +86,8 @@ dat[476,]$yearOfEntry <- 2019
 dat[476,]$yearOfExit <- 2021
 dat <- dat[-c(2088:2110),] # remove years with unclear end
 
-#dat$daysMonitored <- if_else(is.na(dat$daysMonitored), abs(with(dat, as.numeric(difftime(as.Date(dat$dateOfEntry),
-#																	as.Date(dat$dateOfExit)), units = "days"))), dat$daysMonitored)
+dat$daysMonitored <- if_else(is.na(dat$daysMonitored), abs(with(dat, as.numeric(difftime(as.Date(dat$dateOfEntry),
+																	as.Date(dat$dateOfExit)), units = "days"))), dat$daysMonitored)
 
 #dat$yearsMonitored <- dat$daysMonitored / 365
 # create a new variable for finding min month-year
@@ -153,3 +158,38 @@ for (i in 1:ninds){
 
 # use IPMbook to get our mdeadArray
 out <- IPMbook::marrayDead(survMat)
+
+
+
+# transform treatment into a factor
+# treatments$treatment.fact <- as.numeric(as.factor(treatments$treatment))
+
+# pivot on herd
+t <- treatments %>% dplyr::select(herd,year, applied) %>%
+	filter(year %in% seq(min(dat$yearOfEntry), max(dat$yearOfExit), by = 1)) %>%
+	pivot_wider(names_from = year,
+							values_from = applied)
+
+# get an indicator variable: if
+# individual was a member of a herd under any sort of treatment
+dat$treatment <- 0
+for(i in 1:nrow(dat)){
+	years <- seq(dat[i,]$yearOfEntry, dat[i,]$yearOfExit, by = 1)
+	herdIndividual <- dat[i,]$herdCJN # grab herd identifier
+	herdTreatments <- treatments %>% filter(herd == herdIndividual)
+	treatmentYears <- which(herdTreatments$year %in% years)
+	if(any(herdTreatments[treatmentYears,]$applied != 0 &
+				 !is.na(herdTreatments[treatmentYears,]$applied))){
+		dat[i,]$treatment <- 1
+	}
+}
+# transform treatment into a factor
+# treatments$treatment.fact <- as.numeric(as.factor(treatments$treatment))
+
+# pivot on herd
+t <- treatments %>% dplyr::select(herd,year, applied) %>%
+	filter(year %in% seq(min(dat$yearOfEntry), max(dat$yearOfExit), by = 1)) %>%
+	pivot_wider(names_from = year,
+							values_from = applied)
+
+
